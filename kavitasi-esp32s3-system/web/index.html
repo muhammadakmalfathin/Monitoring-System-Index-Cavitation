@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Monitoring Kavitasi — ESP32-S3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --bg:         #0a0d14;
+    --bg2:        #0f1420;
+    --bg3:        #151c2e;
+    --border:     rgba(99,179,255,0.1);
+    --border2:    rgba(99,179,255,0.2);
+    --text:       #e2eaf8;
+    --text2:      #8899bb;
+    --text3:      #4a5878;
+    --accent:     #3b82f6;
+    --accent2:    #60a5fa;
+    --teal:       #14b8a6;
+    --amber:      #f59e0b;
+    --red:        #ef4444;
+    --green:      #22c55e;
+    --purple:     #a78bfa;
+    --mono:       'Space Mono', monospace;
+    --sans:       'DM Sans', sans-serif;
+    --glow:       0 0 20px rgba(59,130,246,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid pattern background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--teal));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+
+  .logo-text h1 {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+
+  .logo-text p {
+    font-size: 11px;
+    color: var(--text2);
+    font-family: var(--mono);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: var(--mono);
+    border: 1px solid;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .pill-online  { color: var(--green);  border-color: rgba(34,197,94,0.3);  background: rgba(34,197,94,0.08); }
+  .pill-online .status-dot { background: var(--green); }
+  .pill-warning { color: var(--amber);  border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }
+  .pill-warning .status-dot { background: var(--amber); }
+  .pill-danger  { color: var(--red);    border-color: rgba(239,68,68,0.3);  background: rgba(239,68,68,0.08); }
+  .pill-danger .status-dot  { background: var(--red);  animation: pulse 0.6s infinite; }
+
+  #last-update {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text3);
+  }
+
+  /* ─── MAIN LAYOUT ─── */
+  main {
+    position: relative;
+    z-index: 1;
+    padding: 24px 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  /* ─── SECTION TITLE ─── */
+  .section-title {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ─── METRIC CARDS ─── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .metric-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .mc-pressure::before { background: var(--accent); }
+  .mc-vibration::before { background: var(--teal); }
+  .mc-current::before { background: var(--amber); }
+  .mc-cav-index::before { background: var(--purple); }
+
+  .metric-card:hover {
+    border-color: var(--border2);
+    box-shadow: var(--glow);
+  }
+
+  .metric-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .metric-label .sensor-tag {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 9px;
+    color: var(--text2);
+  }
+
+  .metric-value {
+    font-size: 28px;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .metric-unit {
+    font-size: 11px;
+    color: var(--text2);
+    font-family: var(--mono);
+  }
+
+  .metric-trend {
+    position: absolute;
+    top: 16px; right: 16px;
+    font-size: 10px;
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  /* ─── KAVITASI STATUS ─── */
+  .kavitasi-banner {
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid;
+    flex-wrap: wrap;
+    gap: 16px;
+    transition: all 0.4s;
+  }
+
+  .kav-normal     { background: rgba(34,197,94,0.06);  border-color: rgba(34,197,94,0.3);  }
+  .kav-incipient  { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.3); }
+  .kav-developed  { background: rgba(239,68,68,0.06);  border-color: rgba(239,68,68,0.3);  }
+  .kav-super      { background: rgba(239,68,68,0.12);  border-color: rgba(239,68,68,0.6);  animation: danger-pulse 1s infinite; }
+
+  @keyframes danger-pulse {
+    0%,100% { box-shadow: none; }
+    50% { box-shadow: 0 0 30px rgba(239,68,68,0.3); }
+  }
+
+  .kav-left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .kav-icon {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    border: 2px solid;
+    flex-shrink: 0;
+  }
+
+  .kav-info h2 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    font-family: var(--mono);
+  }
+
+  .kav-info p {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 3px;
+  }
+
+  .kav-score-area {
+    text-align: right;
+  }
+
+  .kav-score {
+    font-size: 42px;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+
+  .kav-score-label {
+    font-size: 10px;
+    color: var(--text2);
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ─── OPTOCOUPLER STATUS ─── */
+  .opto-section {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .opto-card {
+    flex: 1;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: all 0.3s;
+  }
+
+  .opto-card.active-up   { border-color: rgba(34,197,94,0.5);  background: rgba(34,197,94,0.06);  }
+  .opto-card.active-down { border-color: rgba(239,68,68,0.5);  background: rgba(239,68,68,0.06);  }
+
+  .opto-led {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--text3);
+    box-shadow: none;
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+
+  .opto-led.on-green { background: var(--green); box-shadow: 0 0 12px var(--green); }
+  .opto-led.on-red   { background: var(--red);   box-shadow: 0 0 12px var(--red);   }
+
+  .opto-info h3 {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: -0.2px;
+  }
+
+  .opto-info p {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  .opto-state {
+    margin-left: auto;
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+
+  /* ─── CHARTS GRID ─── */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  @media (max-width: 900px) {
+    .charts-grid { grid-template-columns: 1fr; }
+    main { padding: 16px; }
+    header { padding: 12px 16px; }
+  }
+
+  .chart-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+  }
+
+  .chart-card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .chart-title {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .chart-badge {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+  }
+
+  .chart-wrapper {
+    position: relative;
+    width: 100%;
+    height: 200px;
+  }
+
+  /* ─── KLASIFIKASI TABLE ─── */
+  .table-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+
+  .table-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    background: var(--bg3);
+    padding: 10px 16px;
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-align: left;
+    font-weight: 400;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover { background: var(--bg3); }
+  tbody tr:last-child { border-bottom: none; }
+
+  tbody td {
+    padding: 10px 16px;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text2);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    border: 1px solid;
+  }
+
+  .badge-normal    { color: var(--green);  border-color: rgba(34,197,94,0.4);  background: rgba(34,197,94,0.08); }
+  .badge-incipient { color: var(--amber);  border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.08); }
+  .badge-developed { color: var(--red);    border-color: rgba(239,68,68,0.4);  background: rgba(239,68,68,0.08); }
+  .badge-super     { color: #fff;          border-color: rgba(239,68,68,0.8);  background: rgba(239,68,68,0.25); }
+
+  /* ─── CONTROLS ─── */
+  .controls-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border2);
+    background: var(--bg2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+
+  .btn:hover { background: var(--bg3); border-color: var(--accent); color: var(--accent2); }
+
+  .btn-primary {
+    background: rgba(59,130,246,0.15);
+    border-color: rgba(59,130,246,0.4);
+    color: var(--accent2);
+  }
+
+  .btn-primary:hover { background: rgba(59,130,246,0.25); }
+
+  .btn-download {
+    background: rgba(20,184,166,0.1);
+    border-color: rgba(20,184,166,0.4);
+    color: var(--teal);
+  }
+
+  .btn-download:hover { background: rgba(20,184,166,0.2); }
+
+  /* ─── PID PANEL ─── */
+  .pid-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 28px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .pid-title {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .pid-value-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .pid-param {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .pid-param-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .pid-param-value {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--mono);
+    letter-spacing: -0.5px;
+  }
+
+  .pid-bar-wrap {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .pid-bar-track {
+    background: var(--bg3);
+    border-radius: 4px;
+    height: 8px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .pid-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    background: linear-gradient(90deg, var(--teal), var(--accent));
+  }
+
+  /* ─── LOADING ─── */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    flex-direction: column;
+    gap: 16px;
+    transition: opacity 0.5s;
+  }
+
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .spinner {
+    width: 40px; height: 40px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    letter-spacing: 1px;
+  }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  .kavitasi-guide {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .guide-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border-left: 3px solid;
+  }
+
+  .guide-item h4 { font-size: 12px; font-family: var(--mono); font-weight: 700; margin-bottom: 6px; }
+  .guide-item p  { font-size: 11px; color: var(--text2); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">MEMUAT DATA SENSOR...</div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo-area">
+    <div class="logo-icon">💧</div>
+    <div class="logo-text">
+      <h1>Kavitasi Monitor</h1>
+      <p>ESP32-S3 · WPT83G + MPU6050 + ACS712</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span id="kav-status-pill" class="status-pill pill-online">
+      <span class="status-dot"></span>
+      <span id="kav-status-text">NORMAL</span>
+    </span>
+    <span id="last-update">Memuat...</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- CONTROLS -->
+  <div class="controls-bar">
+    <button class="btn btn-primary" onclick="refreshData()">⟳ Refresh Data</button>
+    <button class="btn btn-download" onclick="downloadCSV()">⬇ Unduh CSV</button>
+    <button class="btn" onclick="toggleAutoRefresh()" id="autoRefreshBtn">◉ Auto-Refresh: OFF</button>
+    <span style="margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--text3);">
+      Setpoint tekanan: <strong style="color:var(--accent2)">4.0 Bar</strong>
+    </span>
+  </div>
+
+  <!-- METRIC CARDS -->
+  <div class="section-title">📊 Pembacaan Sensor Real-time</div>
+  <div class="metrics-grid">
+    <div class="metric-card mc-pressure">
+      <div class="metric-label">
+        Tekanan <span class="sensor-tag">WPT83G</span>
+      </div>
+      <div class="metric-value" id="val-pressure" style="color:var(--accent2)">—</div>
+      <div class="metric-unit">Bar</div>
+      <div class="metric-trend" id="trend-pressure" style="color:var(--text3)"></div>
+    </div>
+    <div class="metric-card mc-vibration">
+      <div class="metric-label">
+        Vibrasi RMS <span class="sensor-tag">MPU6050</span>
+      </div>
+      <div class="metric-value" id="val-vibration" style="color:var(--teal)">—</div>
+      <div class="metric-unit">g RMS</div>
+    </div>
+    <div class="metric-card mc-current">
+      <div class="metric-label">
+        Arus <span class="sensor-tag">ACS712</span>
+      </div>
+      <div class="metric-value" id="val-current" style="color:var(--amber)">—</div>
+      <div class="metric-unit">Ampere</div>
+    </div>
+    <div class="metric-card mc-cav-index">
+      <div class="metric-label">
+        Indeks Kavitasi <span class="sensor-tag">σ (Thoma)</span>
+      </div>
+      <div class="metric-value" id="val-cav-index" style="color:var(--purple)">—</div>
+      <div class="metric-unit">Thoma Number</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Ax <span class="sensor-tag">MPU6050</span></div>
+      <div class="metric-value" id="val-ax" style="color:var(--text); font-size:22px">—</div>
+      <div class="metric-unit">g</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Ay <span class="sensor-tag">MPU6050</span></div>
+      <div class="metric-value" id="val-ay" style="color:var(--text); font-size:22px">—</div>
+      <div class="metric-unit">g</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Az <span class="sensor-tag">MPU6050</span></div>
+      <div class="metric-value" id="val-az" style="color:var(--text); font-size:22px">—</div>
+      <div class="metric-unit">g</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">PID Output <span class="sensor-tag">Fuzzy-PID</span></div>
+      <div class="metric-value" id="val-pid" style="color:var(--text); font-size:22px">—</div>
+      <div class="metric-unit">u(t)</div>
+    </div>
+  </div>
+
+  <!-- KAVITASI STATUS BANNER -->
+  <div class="section-title">⚠️ Status Kavitasi</div>
+  <div id="kavBanner" class="kavitasi-banner kav-normal">
+    <div class="kav-left">
+      <div id="kavIcon" class="kav-icon" style="border-color:var(--green); color:var(--green);">💧</div>
+      <div class="kav-info">
+        <h2 id="kavLabel" style="color:var(--green)">NORMAL</h2>
+        <p id="kavDesc">Sistem berjalan normal, tidak ada kavitasi terdeteksi</p>
+      </div>
+    </div>
+    <div class="kav-score-area">
+      <div class="kav-score" id="kavScore" style="color:var(--green)">0</div>
+      <div class="kav-score-label">Skor Kavitasi (%)</div>
+    </div>
+  </div>
+
+  <!-- PANDUAN KLASIFIKASI -->
+  <div class="kavitasi-guide">
+    <div class="guide-item" style="border-left-color:var(--green)">
+      <h4 style="color:var(--green)">✓ NORMAL</h4>
+      <p>Skor &lt; 20%, tekanan normal, vibrasi rendah. Sistem aman beroperasi.</p>
+    </div>
+    <div class="guide-item" style="border-left-color:var(--amber)">
+      <h4 style="color:var(--amber)">⚡ INCIPIENT</h4>
+      <p>Skor 20–45%. Awal kavitasi. Pantau lebih ketat, pertimbangkan penyesuaian.</p>
+    </div>
+    <div class="guide-item" style="border-left-color:var(--red)">
+      <h4 style="color:var(--red)">🔴 DEVELOPED</h4>
+      <p>Skor 45–75%. Kavitasi aktif. Kurangi kecepatan pompa segera.</p>
+    </div>
+    <div class="guide-item" style="border-left-color:#ff0000">
+      <h4 style="color:#ff0000">💥 SUPERCAVITASI</h4>
+      <p>Skor &gt; 75%. Kritis! Matikan pompa, cek sistem segera.</p>
+    </div>
+  </div>
+
+  <!-- OPTOCOUPLER STATUS -->
+  <div class="section-title">🔌 Kontrol Optocoupler (Fuzzy-PID)</div>
+  <div class="opto-section">
+    <div id="optoUpCard" class="opto-card">
+      <div id="optoUpLed" class="opto-led"></div>
+      <div class="opto-info">
+        <h3>OPTO UP</h3>
+        <p>Naikkan kecepatan pompa</p>
+      </div>
+      <div id="optoUpState" class="opto-state" style="color:var(--text3); background:var(--bg3); border:1px solid var(--border);">OFF</div>
+    </div>
+    <div id="optoDownCard" class="opto-card">
+      <div id="optoDownLed" class="opto-led"></div>
+      <div class="opto-info">
+        <h3>OPTO DOWN</h3>
+        <p>Turunkan kecepatan pompa</p>
+      </div>
+      <div id="optoDownState" class="opto-state" style="color:var(--text3); background:var(--bg3); border:1px solid var(--border);">OFF</div>
+    </div>
+  </div>
+
+  <!-- PID PANEL -->
+  <div class="section-title">🎛️ Parameter Fuzzy-PID</div>
+  <div class="pid-panel">
+    <div>
+      <div class="pid-title">Kp · Ki · Kd</div>
+      <div class="pid-value-row">
+        <div class="pid-param">
+          <div class="pid-param-label">Kp</div>
+          <div class="pid-param-value" style="color:var(--accent2)">1.20</div>
+        </div>
+        <div class="pid-param">
+          <div class="pid-param-label">Ki</div>
+          <div class="pid-param-value" style="color:var(--teal)">0.10</div>
+        </div>
+        <div class="pid-param">
+          <div class="pid-param-label">Kd</div>
+          <div class="pid-param-value" style="color:var(--amber)">0.05</div>
+        </div>
+        <div class="pid-param">
+          <div class="pid-param-label">Setpoint</div>
+          <div class="pid-param-value" style="color:var(--purple)">4.0 Bar</div>
+        </div>
+      </div>
+    </div>
+    <div class="pid-bar-wrap">
+      <div class="pid-title">Output PID (−10 hingga +10)</div>
+      <div class="pid-bar-track">
+        <div class="pid-bar-fill" id="pidBarFill" style="width:50%;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:6px;">
+        <span style="font-size:10px; font-family:var(--mono); color:var(--text3);">-10 (DOWN)</span>
+        <span style="font-size:10px; font-family:var(--mono); color:var(--accent2)" id="pidBarLabel">0.0</span>
+        <span style="font-size:10px; font-family:var(--mono); color:var(--text3);">+10 (UP)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="section-title">📈 Grafik Real-time</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Tekanan (WPT83G)</span>
+        <span class="chart-badge">Bar</span>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="chartPressure" role="img" aria-label="Grafik tekanan air dari sensor WPT83G dalam satuan Bar"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Vibrasi RMS (MPU6050)</span>
+        <span class="chart-badge">g RMS</span>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="chartVibration" role="img" aria-label="Grafik vibrasi akselerasi dari sensor MPU6050"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Arus (ACS712)</span>
+        <span class="chart-badge">Ampere</span>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="chartCurrent" role="img" aria-label="Grafik arus dari sensor ACS712"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Indeks Kavitasi (σ)</span>
+        <span class="chart-badge">Thoma Number</span>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="chartCavIndex" role="img" aria-label="Grafik indeks kavitasi Thoma Number"></canvas>
+      </div>
+    </div>
+    <div class="chart-card full-width">
+      <div class="chart-header">
+        <span class="chart-title">Akselerasi 3-Axis (MPU6050)</span>
+        <span class="chart-badge">Ax · Ay · Az</span>
+      </div>
+      <div class="chart-wrapper" style="height:220px">
+        <canvas id="chartAccel" role="img" aria-label="Grafik akselerasi 3-axis X Y Z dari MPU6050"></canvas>
+      </div>
+    </div>
+    <div class="chart-card full-width">
+      <div class="chart-header">
+        <span class="chart-title">Output Fuzzy-PID & Kontrol Optocoupler</span>
+        <span class="chart-badge">u(t)</span>
+      </div>
+      <div class="chart-wrapper" style="height:220px">
+        <canvas id="chartPID" role="img" aria-label="Grafik output PID dan status optocoupler"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div class="section-title">📋 Riwayat Pembacaan & Klasifikasi</div>
+  <div class="table-card">
+    <div class="table-header">
+      <span style="font-size:12px; font-family:var(--mono); color:var(--text2)">
+        <strong id="tableCount" style="color:var(--accent2)">0</strong> data tersimpan
+      </span>
+      <button class="btn btn-download" onclick="downloadCSV()" style="padding:6px 12px; font-size:11px;">⬇ CSV</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Waktu (ms)</th>
+            <th>Tekanan (Bar)</th>
+            <th>Vibrasi (g)</th>
+            <th>Arus (A)</th>
+            <th>Ax</th><th>Ay</th><th>Az</th>
+            <th>Cav. Index (σ)</th>
+            <th>Klasifikasi</th>
+            <th>PID Output</th>
+            <th>Opto UP</th>
+            <th>Opto DOWN</th>
+          </tr>
+        </thead>
+        <tbody id="dataTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════
+// DATA & STATE
+// ═══════════════════════════════════════════
+let allData = [];
+let autoRefreshInterval = null;
+let autoRefreshOn = false;
+
+const DATA_URL = './data/sensor_data.json';
+
+// ═══════════════════════════════════════════
+// CHARTS INITIALIZATION
+// ═══════════════════════════════════════════
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 400 },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#0f1420',
+      borderColor: 'rgba(99,179,255,0.2)',
+      borderWidth: 1,
+      titleColor: '#8899bb',
+      bodyColor: '#e2eaf8',
+      titleFont: { family: "'Space Mono', monospace", size: 10 },
+      bodyFont: { family: "'Space Mono', monospace", size: 11 }
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#4a5878', font: { family: "'Space Mono', monospace", size: 9 }, maxTicksLimit: 8 },
+      grid: { color: 'rgba(99,179,255,0.05)' }
+    },
+    y: {
+      ticks: { color: '#4a5878', font: { family: "'Space Mono', monospace", size: 9 } },
+      grid: { color: 'rgba(99,179,255,0.07)' }
+    }
+  }
+};
+
+function makeChart(id, color, label, fill = true) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label,
+        data: [],
+        borderColor: color,
+        backgroundColor: fill ? color + '18' : 'transparent',
+        borderWidth: 1.5,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        tension: 0.3,
+        fill: fill
+      }]
+    },
+    options: { ...chartDefaults }
+  });
+}
+
+const chartPressure  = makeChart('chartPressure',  '#3b82f6', 'Tekanan (Bar)');
+const chartVibration = makeChart('chartVibration', '#14b8a6', 'Vibrasi (g)');
+const chartCurrent   = makeChart('chartCurrent',   '#f59e0b', 'Arus (A)');
+const chartCavIndex  = makeChart('chartCavIndex',  '#a78bfa', 'Cav. Index');
+
+// 3-axis chart
+const ctxAccel = document.getElementById('chartAccel').getContext('2d');
+const chartAccel = new Chart(ctxAccel, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'Ax', data: [], borderColor: '#3b82f6', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 1.5, tension: 0.3, fill: false, borderDash: [] },
+      { label: 'Ay', data: [], borderColor: '#14b8a6', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 1.5, tension: 0.3, fill: false, borderDash: [5,3] },
+      { label: 'Az', data: [], borderColor: '#f59e0b', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 1.5, tension: 0.3, fill: false, borderDash: [2,2] }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    plugins: {
+      ...chartDefaults.plugins,
+      legend: {
+        display: true,
+        labels: { color: '#8899bb', font: { family: "'Space Mono', monospace", size: 10 }, boxWidth: 20, padding: 16 }
+      }
+    }
+  }
+});
+
+// PID chart
+const ctxPID = document.getElementById('chartPID').getContext('2d');
+const chartPID = new Chart(ctxPID, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'PID Output', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.08)', borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true },
+      { label: 'Opto UP', data: [], borderColor: '#22c55e', backgroundColor: 'transparent', borderWidth: 1, pointRadius: 0, tension: 0, fill: false, borderDash: [4,3] },
+      { label: 'Opto DOWN', data: [], borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 1, pointRadius: 0, tension: 0, fill: false, borderDash: [4,3] }
+    ]
+  },
+  options: {
+    ...chartDefaults,
+    plugins: {
+      ...chartDefaults.plugins,
+      legend: {
+        display: true,
+        labels: { color: '#8899bb', font: { family: "'Space Mono', monospace", size: 10 }, boxWidth: 20, padding: 16 }
+      }
+    }
+  }
+});
+
+// ═══════════════════════════════════════════
+// DATA LOADING & RENDERING
+// ═══════════════════════════════════════════
+async function refreshData() {
+  try {
+    const resp = await fetch(DATA_URL + '?t=' + Date.now());
+    const json = await resp.json();
+    allData = json.readings || [];
+    renderAll(allData, json.updated_at);
+  } catch (e) {
+    // Demo: generate simulated data
+    allData = generateDemoData();
+    renderAll(allData, Date.now());
+  }
+  document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
+function generateDemoData() {
+  const data = [];
+  let p = 4.0, v = 0.15, c = 5.3;
+  for (let i = 0; i < 40; i++) {
+    p += (Math.random() - 0.5) * 0.3;
+    v += (Math.random() - 0.5) * 0.1;
+    c += (Math.random() - 0.5) * 0.2;
+    p = Math.max(0.5, Math.min(8, p));
+    v = Math.max(0.05, Math.min(3.5, v));
+    c = Math.max(3, Math.min(10, c));
+    const cavScore = Math.max(0, (4 - p) / 4 * 100 * 0.4 + v / 2.5 * 100 * 0.4);
+    const cavClass = cavScore < 20 ? 0 : cavScore < 45 ? 1 : cavScore < 75 ? 2 : 3;
+    const labels = ['NORMAL','INCIPIENT','DEVELOPED','SUPERCAVITATION'];
+    const pidOut = (4.0 - p) * 1.2;
+    data.push({
+      ts: (i + 1) * 1000,
+      pressure: +p.toFixed(3),
+      accel_x: +(Math.random() * 0.1 * v).toFixed(3),
+      accel_y: +(Math.random() * 0.08 * v).toFixed(3),
+      accel_z: +(1 + Math.random() * 0.05 * v).toFixed(3),
+      vibration: +v.toFixed(3),
+      current: +c.toFixed(3),
+      cav_index: +((p - 0.023) / Math.max(p, 0.001)).toFixed(3),
+      cav_class: cavClass,
+      cav_label: labels[cavClass],
+      pid_output: +pidOut.toFixed(3),
+      opto_up: pidOut > 0.5,
+      opto_down: pidOut < -0.5
+    });
+  }
+  return data;
+}
+
+function renderAll(data, updatedAt) {
+  if (!data.length) return;
+  const latest = data[data.length - 1];
+
+  // Update metrics
+  document.getElementById('val-pressure').textContent  = latest.pressure.toFixed(2);
+  document.getElementById('val-vibration').textContent = latest.vibration.toFixed(3);
+  document.getElementById('val-current').textContent   = latest.current.toFixed(2);
+  document.getElementById('val-cav-index').textContent = latest.cav_index.toFixed(3);
+  document.getElementById('val-ax').textContent        = latest.accel_x.toFixed(3);
+  document.getElementById('val-ay').textContent        = latest.accel_y.toFixed(3);
+  document.getElementById('val-az').textContent        = latest.accel_z.toFixed(3);
+  document.getElementById('val-pid').textContent       = latest.pid_output.toFixed(2);
+
+  // Pressure trend
+  if (data.length >= 2) {
+    const prev = data[data.length - 2];
+    const delta = latest.pressure - prev.pressure;
+    const trendEl = document.getElementById('trend-pressure');
+    trendEl.textContent = (delta >= 0 ? '▲ ' : '▼ ') + Math.abs(delta).toFixed(2);
+    trendEl.style.color = delta >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+
+  // PID bar
+  const pidNorm = (latest.pid_output + 10) / 20 * 100;
+  document.getElementById('pidBarFill').style.width = pidNorm.toFixed(1) + '%';
+  document.getElementById('pidBarLabel').textContent = latest.pid_output.toFixed(2);
+
+  // Kavitasi banner
+  updateKavBanner(latest);
+
+  // Optocoupler
+  updateOpto(latest.opto_up, latest.opto_down);
+
+  // Charts
+  const labels = data.map(d => (d.ts / 1000).toFixed(1) + 's');
+
+  updateLineChart(chartPressure, labels, data.map(d => d.pressure));
+  updateLineChart(chartVibration, labels, data.map(d => d.vibration));
+  updateLineChart(chartCurrent, labels, data.map(d => d.current));
+  updateLineChart(chartCavIndex, labels, data.map(d => d.cav_index));
+
+  chartAccel.data.labels = labels;
+  chartAccel.data.datasets[0].data = data.map(d => d.accel_x);
+  chartAccel.data.datasets[1].data = data.map(d => d.accel_y);
+  chartAccel.data.datasets[2].data = data.map(d => d.accel_z);
+  chartAccel.update();
+
+  chartPID.data.labels = labels;
+  chartPID.data.datasets[0].data = data.map(d => d.pid_output);
+  chartPID.data.datasets[1].data = data.map(d => d.opto_up ? 10 : 0);
+  chartPID.data.datasets[2].data = data.map(d => d.opto_down ? -10 : 0);
+  chartPID.update();
+
+  // Table
+  renderTable(data);
+
+  // Last update
+  const d = new Date(updatedAt);
+  document.getElementById('last-update').textContent = 'Update: ' + d.toLocaleTimeString('id-ID');
+}
+
+function updateLineChart(chart, labels, data) {
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = data;
+  chart.update();
+}
+
+function updateKavBanner(latest) {
+  const cls = latest.cav_class;
+  const score = Math.round(
+    Math.max(0, (4 - latest.pressure) / 4 * 100) * 0.4 +
+    Math.min(latest.vibration / 2.5 * 100, 100) * 0.4 +
+    Math.min(Math.max(0, (latest.current - 5.6) / 2.4) * 100, 100) * 0.2
+  );
+
+  const configs = {
+    0: { banner: 'kav-normal',    color: 'var(--green)',  icon: '💧', label: 'NORMAL',          desc: 'Sistem berjalan normal, tidak ada kavitasi terdeteksi', pill: 'pill-online',  pillTxt: 'NORMAL' },
+    1: { banner: 'kav-incipient', color: 'var(--amber)',  icon: '⚡', label: 'INCIPIENT',        desc: 'Kavitasi awal terdeteksi — pantau dan sesuaikan kecepatan',    pill: 'pill-warning', pillTxt: 'INCIPIENT' },
+    2: { banner: 'kav-developed', color: 'var(--red)',    icon: '🔴', label: 'DEVELOPED',        desc: 'Kavitasi berkembang aktif — segera turunkan kecepatan pompa',  pill: 'pill-danger',  pillTxt: 'DEVELOPED' },
+    3: { banner: 'kav-super',     color: '#ff3333',       icon: '💥', label: 'SUPERCAVITASI',    desc: '⚠ KRITIS: Superkavitasi! Hentikan pompa dan lakukan inspeksi', pill: 'pill-danger',  pillTxt: 'KRITIS!' }
+  };
+
+  const cfg = configs[cls] || configs[0];
+
+  const banner = document.getElementById('kavBanner');
+  banner.className = 'kavitasi-banner ' + cfg.banner;
+  document.getElementById('kavIcon').textContent = cfg.icon;
+  document.getElementById('kavIcon').style.borderColor = cfg.color;
+  document.getElementById('kavIcon').style.color = cfg.color;
+  document.getElementById('kavLabel').textContent = cfg.label;
+  document.getElementById('kavLabel').style.color = cfg.color;
+  document.getElementById('kavDesc').textContent = cfg.desc;
+  document.getElementById('kavScore').textContent = score;
+  document.getElementById('kavScore').style.color = cfg.color;
+
+  const pill = document.getElementById('kav-status-pill');
+  pill.className = 'status-pill ' + cfg.pill;
+  document.getElementById('kav-status-text').textContent = cfg.pillTxt;
+}
+
+function updateOpto(up, down) {
+  const upCard  = document.getElementById('optoUpCard');
+  const downCard = document.getElementById('optoDownCard');
+  const upLed   = document.getElementById('optoUpLed');
+  const downLed = document.getElementById('optoDownLed');
+  const upState  = document.getElementById('optoUpState');
+  const downState = document.getElementById('optoDownState');
+
+  if (up) {
+    upCard.className = 'opto-card active-up';
+    upLed.className = 'opto-led on-green';
+    upState.textContent = 'ON ▲';
+    upState.style.cssText = 'color:var(--green); background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.4);';
+  } else {
+    upCard.className = 'opto-card';
+    upLed.className = 'opto-led';
+    upState.textContent = 'OFF';
+    upState.style.cssText = 'color:var(--text3); background:var(--bg3); border:1px solid var(--border);';
+  }
+
+  if (down) {
+    downCard.className = 'opto-card active-down';
+    downLed.className = 'opto-led on-red';
+    downState.textContent = 'ON ▼';
+    downState.style.cssText = 'color:var(--red); background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.4);';
+  } else {
+    downCard.className = 'opto-card';
+    downLed.className = 'opto-led';
+    downState.textContent = 'OFF';
+    downState.style.cssText = 'color:var(--text3); background:var(--bg3); border:1px solid var(--border);';
+  }
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById('dataTable');
+  const badgeClass = ['badge-normal','badge-incipient','badge-developed','badge-super'];
+
+  tbody.innerHTML = [...data].reverse().map(r => `
+    <tr>
+      <td>${r.ts}</td>
+      <td>${r.pressure.toFixed(3)}</td>
+      <td>${r.vibration.toFixed(3)}</td>
+      <td>${r.current.toFixed(3)}</td>
+      <td>${r.accel_x.toFixed(3)}</td>
+      <td>${r.accel_y.toFixed(3)}</td>
+      <td>${r.accel_z.toFixed(3)}</td>
+      <td>${r.cav_index.toFixed(3)}</td>
+      <td><span class="badge ${badgeClass[r.cav_class]}">${r.cav_label}</span></td>
+      <td style="color:${r.pid_output > 0 ? 'var(--green)' : r.pid_output < 0 ? 'var(--red)' : 'var(--text2)'}">${r.pid_output.toFixed(3)}</td>
+      <td style="color:${r.opto_up ? 'var(--green)' : 'var(--text3)'}">${r.opto_up ? '▲ ON' : '—'}</td>
+      <td style="color:${r.opto_down ? 'var(--red)' : 'var(--text3)'}">${r.opto_down ? '▼ ON' : '—'}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('tableCount').textContent = data.length;
+}
+
+// ═══════════════════════════════════════════
+// CSV DOWNLOAD
+// ═══════════════════════════════════════════
+function downloadCSV() {
+  if (!allData.length) return;
+  const headers = ['Timestamp_ms','Tekanan_Bar','Vibrasi_g','Arus_A','Accel_X_g','Accel_Y_g','Accel_Z_g','CavIndex_sigma','Cav_Class','Cav_Label','PID_Output','OptoUP','OptoDOWN'];
+  const rows = allData.map(r => [
+    r.ts, r.pressure, r.vibration, r.current,
+    r.accel_x, r.accel_y, r.accel_z,
+    r.cav_index, r.cav_class, r.cav_label,
+    r.pid_output, r.opto_up ? 1 : 0, r.opto_down ? 1 : 0
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'kavitasi_data_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════
+// AUTO REFRESH
+// ═══════════════════════════════════════════
+function toggleAutoRefresh() {
+  autoRefreshOn = !autoRefreshOn;
+  const btn = document.getElementById('autoRefreshBtn');
+  if (autoRefreshOn) {
+    autoRefreshInterval = setInterval(refreshData, 10000);
+    btn.textContent = '◉ Auto-Refresh: ON (10s)';
+    btn.style.borderColor = 'rgba(34,197,94,0.5)';
+    btn.style.color = 'var(--green)';
+  } else {
+    clearInterval(autoRefreshInterval);
+    btn.textContent = '◉ Auto-Refresh: OFF';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+  }
+}
+
+// Init
+refreshData();
+</script>
+</body>
+</html>

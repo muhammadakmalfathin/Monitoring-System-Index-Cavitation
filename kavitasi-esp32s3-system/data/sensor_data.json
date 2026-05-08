@@ -1,0 +1,15 @@
+{
+  "updated_at": 1715000000000,
+  "readings": [
+    {"ts":1000,"pressure":4.2,"accel_x":0.01,"accel_y":0.02,"accel_z":1.0,"vibration":0.12,"current":5.2,"cav_index":0.99,"cav_class":0,"cav_label":"NORMAL","pid_output":0.1,"opto_up":false,"opto_down":false},
+    {"ts":2000,"pressure":3.8,"accel_x":0.02,"accel_y":0.03,"accel_z":1.0,"vibration":0.25,"current":5.5,"cav_index":0.99,"cav_class":0,"cav_label":"NORMAL","pid_output":0.2,"opto_up":true,"opto_down":false},
+    {"ts":3000,"pressure":3.1,"accel_x":0.05,"accel_y":0.04,"accel_z":1.01,"vibration":0.58,"current":6.1,"cav_index":0.99,"cav_class":1,"cav_label":"INCIPIENT","pid_output":0.9,"opto_up":true,"opto_down":false},
+    {"ts":4000,"pressure":2.5,"accel_x":0.12,"accel_y":0.09,"accel_z":1.02,"vibration":1.2,"current":7.0,"cav_index":0.99,"cav_class":1,"cav_label":"INCIPIENT","pid_output":1.5,"opto_up":true,"opto_down":false},
+    {"ts":5000,"pressure":1.8,"accel_x":0.28,"accel_y":0.22,"accel_z":1.05,"vibration":2.1,"current":8.3,"cav_index":0.99,"cav_class":2,"cav_label":"DEVELOPED","pid_output":2.2,"opto_up":true,"opto_down":false},
+    {"ts":6000,"pressure":1.2,"accel_x":0.45,"accel_y":0.38,"accel_z":1.08,"vibration":2.9,"current":9.1,"cav_index":0.98,"cav_class":3,"cav_label":"SUPERCAVITATION","pid_output":3.0,"opto_up":true,"opto_down":false},
+    {"ts":7000,"pressure":2.2,"accel_x":0.3,"accel_y":0.25,"accel_z":1.05,"vibration":2.2,"current":7.8,"cav_index":0.99,"cav_class":2,"cav_label":"DEVELOPED","pid_output":1.8,"opto_up":true,"opto_down":false},
+    {"ts":8000,"pressure":3.2,"accel_x":0.1,"accel_y":0.08,"accel_z":1.02,"vibration":1.0,"current":6.2,"cav_index":0.99,"cav_class":1,"cav_label":"INCIPIENT","pid_output":0.8,"opto_up":true,"opto_down":false},
+    {"ts":9000,"pressure":4.0,"accel_x":0.02,"accel_y":0.02,"accel_z":1.0,"vibration":0.2,"current":5.4,"cav_index":0.99,"cav_class":0,"cav_label":"NORMAL","pid_output":0.05,"opto_up":false,"opto_down":false},
+    {"ts":10000,"pressure":4.3,"accel_x":0.01,"accel_y":0.01,"accel_z":1.0,"vibration":0.15,"current":5.1,"cav_index":0.99,"cav_class":0,"cav_label":"NORMAL","pid_output":-0.3,"opto_up":false,"opto_down":true}
+  ]
+}
