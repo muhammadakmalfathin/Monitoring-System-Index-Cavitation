@@ -1,0 +1,158 @@
+name: ESP32 Kavitasi CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'esp32-firmware/**'
+      - 'firebase/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  ARDUINO_CLI_VERSION: "0.35.3"
+  BOARD_FQBN: "esp32:esp32:esp32s3"
+
+jobs:
+  # ──────────────────────────────────────────
+  # JOB 1: Build & Compile ESP32 Firmware
+  # ──────────────────────────────────────────
+  build-firmware:
+    name: 🔨 Build ESP32S3 Firmware
+    runs-on: ubuntu-latest
+    outputs:
+      firmware_sha: ${{ steps.hash.outputs.sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Arduino CLI tools
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.arduino15
+            ~/Arduino/libraries
+          key: arduino-${{ runner.os }}-${{ hashFiles('esp32-firmware/**') }}
+          restore-keys: arduino-${{ runner.os }}-
+
+      - name: Install Arduino CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh
+          arduino-cli version
+
+      - name: Configure Arduino CLI
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls \
+            https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+      - name: Install ESP32 platform
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.14
+
+      - name: Install required libraries
+        run: |
+          arduino-cli lib install "MPU6050@0.2.1"
+          arduino-cli lib install "ArduinoJson@6.21.3"
+          arduino-cli lib install "ESP32@2.0.14"
+
+      - name: Inject WiFi credentials from secrets
+        run: |
+          sed -i 's/YOUR_SSID/${{ secrets.WIFI_SSID }}/g' esp32-firmware/kavitasi_main.ino
+          sed -i 's/YOUR_PASSWORD/${{ secrets.WIFI_PASSWORD }}/g' esp32-firmware/kavitasi_main.ino
+          sed -i 's/your-project/${{ secrets.FIREBASE_PROJECT_ID }}/g' esp32-firmware/kavitasi_main.ino
+          sed -i 's/YOUR_FIREBASE_SECRET_OR_TOKEN/${{ secrets.FIREBASE_AUTH_TOKEN }}/g' esp32-firmware/kavitasi_main.ino
+
+      - name: Compile firmware
+        run: |
+          mkdir -p build/firmware
+          arduino-cli compile \
+            --fqbn ${{ env.BOARD_FQBN }} \
+            --output-dir build/firmware \
+            --verbose \
+            esp32-firmware/kavitasi_main.ino
+
+      - name: Generate firmware hash
+        id: hash
+        run: |
+          SHA=$(sha256sum build/firmware/*.bin | head -c 16)
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "Firmware SHA: $SHA"
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp32s3-firmware-${{ github.sha }}
+          path: build/firmware/
+          retention-days: 30
+
+  # ──────────────────────────────────────────
+  # JOB 2: Deploy Firebase Rules & Functions
+  # ──────────────────────────────────────────
+  deploy-firebase:
+    name: 🔥 Deploy Firebase
+    runs-on: ubuntu-latest
+    needs: build-firmware
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: firebase/package.json
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@13
+
+      - name: Install Firebase functions deps
+        working-directory: firebase
+        run: npm ci
+
+      - name: Deploy Firebase Realtime Database rules
+        run: |
+          firebase deploy \
+            --only database \
+            --project ${{ secrets.FIREBASE_PROJECT_ID }} \
+            --token ${{ secrets.FIREBASE_CI_TOKEN }} \
+            --non-interactive
+
+      - name: Deploy Firebase Hosting (dashboard)
+        run: |
+          firebase deploy \
+            --only hosting \
+            --project ${{ secrets.FIREBASE_PROJECT_ID }} \
+            --token ${{ secrets.FIREBASE_CI_TOKEN }} \
+            --non-interactive
+
+      - name: Post deployment notification
+        run: |
+          echo "✅ Firebase deployment berhasil untuk commit ${{ github.sha }}"
+          echo "🔗 Dashboard: https://${{ secrets.FIREBASE_PROJECT_ID }}.web.app"
+
+  # ──────────────────────────────────────────
+  # JOB 3: Notifikasi Status
+  # ──────────────────────────────────────────
+  notify:
+    name: 📣 Notifikasi
+    runs-on: ubuntu-latest
+    needs: [build-firmware, deploy-firebase]
+    if: always()
+
+    steps:
+      - name: Build status summary
+        run: |
+          echo "## 📊 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ESP32 Firmware Build | ${{ needs.build-firmware.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Firebase Deploy | ${{ needs.deploy-firebase.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Firmware SHA | ${{ needs.build-firmware.outputs.firmware_sha }} |" >> $GITHUB_STEP_SUMMARY
