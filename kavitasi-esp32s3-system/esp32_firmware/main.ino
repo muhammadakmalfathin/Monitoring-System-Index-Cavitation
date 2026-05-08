@@ -16,18 +16,18 @@
 #include <math.h>
 
 // ─── KONFIGURASI WiFi & GitHub ─────────────────────────────
-const char* WIFI_SSID     = "YOUR_SSID";
-const char* WIFI_PASSWORD = "YOUR_PASSWORD";
+const char* WIFI_SSID     = "@wifi";
+const char* WIFI_PASSWORD = "suksesaja";
 const char* GITHUB_TOKEN  = "ghp_YOUR_GITHUB_TOKEN";
 const char* GITHUB_REPO   = "username/repo-kavitasi";
 const char* DATA_FILE     = "data/sensor_data.json";
 const char* GITHUB_API    = "https://api.github.com";
 
 // ─── PIN DEFINITIONS ───────────────────────────────────────
-#define PIN_ACS712        34    // ADC1 - Sensor arus
-#define PIN_WPT83G        35    // ADC1 - Sensor tekanan
-#define PIN_OPTO_UP       25    // Output - Optocoupler NAIK kecepatan
-#define PIN_OPTO_DOWN     26    // Output - Optocoupler TURUN kecepatan
+#define PIN_ACS712        5    // ADC1 - Sensor arus
+#define PIN_WPT83G        4    // ADC1 - Sensor tekanan
+#define PIN_OPTO_UP       16    // Output - Optocoupler NAIK kecepatan
+#define PIN_OPTO_DOWN     17    // Output - Optocoupler TURUN kecepatan
 #define PIN_LED_STATUS    2     // LED built-in status
 
 // ─── KONSTANTA SENSOR ──────────────────────────────────────
